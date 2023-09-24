@@ -1,8 +1,7 @@
-import { exit } from 'node:process';
-import { createInterface } from 'node:readline';
-
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { exit } from 'node:process';
+import { createInterface } from 'node:readline';
 
 const reader = createInterface({
     input: process.stdin,

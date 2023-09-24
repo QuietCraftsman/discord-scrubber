@@ -1,25 +1,10 @@
+import inquirer from 'inquirer';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { exit } from 'node:process';
-import { createInterface } from 'node:readline';
 
-const reader = createInterface({
-    input: process.stdin,
-    output: process.stdout
-});
 
-reader.question("Path to Discord data dump? ", (answer) => {
-    if (!answer) {
-        console.error("Path cannot be empty!");
-        reader.close();
-        exit(1);
-    }
-
-    crawlDataDump(answer);
-    reader.close();
-});
-
-const crawlDataDump = (dataDumpPath) => {
+const crawlDataDump = async (dataDumpPath) => {
     // Read the index.json from the messages directory.
     const indexPath = join(dataDumpPath, 'messages', 'index.json');
 
@@ -40,11 +25,60 @@ const crawlDataDump = (dataDumpPath) => {
         return subdirectory.startsWith('c') && statSync(fullSubdirectoryPath).isDirectory();
     });
 
-    // Print out the testing output.
-    for (const subdirectory of subdirectories) {
-        const channelId = subdirectory.slice(1); // Remove the 'c' prefix to get the channel ID
-        const channelName = indexData[channelId] || ""; // Fetch name from index or default to empty string
+    await displayChannelList(dataDumpPath, indexData, subdirectories);
+}
 
-        console.log(`${subdirectory}: ${channelName}`);
+const displayChannelList = async (dataDumpPath, indexData, subdirectories) => {
+    const choices = subdirectories.map((subdirectory) => {
+        const channelId = subdirectory.slice(1);
+        const channelName = indexData.hasOwnProperty(channelId) ? indexData[channelId] : "NOT FOUND IN INDEX";
+
+        return {
+            name: `${subdirectory}: ${channelName}`,
+            value: subdirectory
+        };
+    });
+
+    choices.push(new inquirer.Separator());
+    choices.push({
+        name: "Exit",
+        value: "exit"
+    });
+
+    const { selectedChannel } = await inquirer.prompt([
+        {
+            type: 'list',
+            name: 'selectedChannel',
+            message: 'Select a channel:',
+            choices: choices
+        }
+    ]);
+
+    if (selectedChannel === "exit") {
+        exit(0);
+    } else {
+        // Display messages or further navigation for the selected channel
+        console.log(`Selected: ${selectedChannel}`);
+        // ... Implement logic to display messages or other operations
     }
 }
+
+// Start the script by prompting the user for the data dump path.
+inquirer.prompt([
+    {
+        type: 'input',
+        name: 'dataDumpPath',
+        message: 'Path to Discord data dump?',
+        validate: (input) => input ? true : "Path cannot be empty!"
+    }
+]).then(async (answers) => {
+    await crawlDataDump(answers.dataDumpPath);
+});
+
+// Print out the testing output.
+// for (const subdirectory of subdirectories) {
+//     const channelId = subdirectory.slice(1); // Remove the 'c' prefix to get the channel ID
+//     const channelName = indexData[channelId] || ""; // Fetch name from index or default to empty string
+
+//     console.log(`${subdirectory}: ${channelName}`);
+// }

@@ -22,5 +22,8 @@
   "bugs": {
     "url": "https://github.com/QuietCraftsman/discord-scrubber/issues"
   },
-  "homepage": "https://github.com/QuietCraftsman/discord-scrubber#readme"
+  "homepage": "https://github.com/QuietCraftsman/discord-scrubber#readme",
+  "dependencies": {
+    "inquirer": "^9.2.11"
+  }
 }

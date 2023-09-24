@@ -1,0 +1,26 @@
+{
+  "name": "discord-scrubber",
+  "version": "0.1.0",
+  "description": "A simple tool for poring over a Discord data dump and removing content.",
+  "main": "scrubber.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node scrubber.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/QuietCraftsman/discord-scrubber.git"
+  },
+  "keywords": [
+    "Discord",
+    "scrubber",
+    "tool",
+    "Node"
+  ],
+  "author": "QuietCraftsman",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/QuietCraftsman/discord-scrubber/issues"
+  },
+  "homepage": "https://github.com/QuietCraftsman/discord-scrubber#readme"
+}

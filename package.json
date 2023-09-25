@@ -25,6 +25,7 @@
   "homepage": "https://github.com/QuietCraftsman/discord-scrubber#readme",
   "dependencies": {
     "csv-parser": "^3.0.0",
-    "inquirer": "^9.2.11"
+    "inquirer": "^9.2.11",
+    "sqlite3": "^5.1.6"
   }
 }

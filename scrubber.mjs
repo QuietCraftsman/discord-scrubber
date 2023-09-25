@@ -60,7 +60,6 @@ const displayChannelList = async (dataDumpPath, indexData, subdirectories) => {
         exit(0);
     } else {
         // Display messages or further navigation for the selected channel
-        // console.log(`Selected: ${selectedChannel}`);
         await displayMessages(selectedChannel, dataDumpPath, indexData, subdirectories);
     }
 };
@@ -89,6 +88,10 @@ const displayMessages = async (selectedChannel, dataDumpPath, indexData, subdire
         .on('end', async () => {
             messages.push(new inquirer.Separator());
             messages.push({
+                name: "Delete messages",
+                value: "delete_messages"
+            });
+            messages.push({
                 name: "Back to Channel List",
                 value: "back_to_list"
             });
@@ -105,14 +108,46 @@ const displayMessages = async (selectedChannel, dataDumpPath, indexData, subdire
 
             if (selectedMessage === "back_to_list") {
                 await displayChannelList(dataDumpPath, indexData, subdirectories);
+            } else if (selectedMessage === "delete_messages") {
+                await deleteMessages(selectedChannel, messages, dataDumpPath, indexData, subdirectories);
             } else {
-                // For now, we just print the selected message ID, but you can expand this section
-                // to display more details or provide further options.
                 console.log(`Selected Message ID: ${selectedMessage}`);
                 await displayMessages(selectedChannel, dataDumpPath, indexData, subdirectories); // Return to message list
             }
         });
 };
+
+const deleteMessages = async (selectedChannel, messages, dataDumpPath, indexData, subdirectories) => {
+    const validMessages = messages.filter((message) => {
+        return message.value &&
+            typeof message.value === 'string' &&
+            !["back_to_list", "delete_messages"].includes(message.value)
+    });
+
+
+    for (const message of validMessages) {
+        // Avoid trying to delete separators.
+        if (message.value !== "back_to_list" && message.value !== "delete_messages") {
+            // Mocking the HTTP DELETE.
+            console.log(`Deleted message with ID: ${message.value}`);
+
+            // Mimic a small delay.
+            await new Promise((resolve) => {
+                setTimeout(resolve, 100);
+            });
+        }
+    }
+
+    // Remove the processed channel from the subdirs list.
+    const index = subdirectories.indexOf(selectedChannel);
+
+    if (index > -1) {
+        subdirectories.splice(index, 1);
+    }
+
+    // Return to channel listing after a successful completion.
+    await displayChannelList(dataDumpPath, indexData, subdirectories);
+}
 
 // Start the script by prompting the user for the data dump path.
 inquirer.prompt([
@@ -121,15 +156,14 @@ inquirer.prompt([
         name: 'dataDumpPath',
         message: 'Path to Discord data dump?',
         validate: (input) => input ? true : "Path cannot be empty!"
+    },
+    {
+        type: 'password',   // To hide the token when being entered
+        name: 'accessToken',
+        message: 'Please enter a valid access token:',
+        validate: (input) => input ? true : "Access token cannot be empty!"
     }
 ]).then(async (answers) => {
+    global.accessToken = answers.accessToken;   // Store the token globally for later
     await crawlDataDump(answers.dataDumpPath);
 });
-
-// Print out the testing output.
-// for (const subdirectory of subdirectories) {
-//     const channelId = subdirectory.slice(1); // Remove the 'c' prefix to get the channel ID
-//     const channelName = indexData[channelId] || ""; // Fetch name from index or default to empty string
-
-//     console.log(`${subdirectory}: ${channelName}`);
-// }

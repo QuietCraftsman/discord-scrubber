@@ -126,16 +126,31 @@ const deleteMessages = async (selectedChannel, messages, dataDumpPath, indexData
 
 
     for (const message of validMessages) {
-        // Avoid trying to delete separators.
-        if (message.value !== "back_to_list" && message.value !== "delete_messages") {
-            // Mocking the HTTP DELETE.
-            console.log(`Deleted message with ID: ${message.value}`);
+        let retry = false;
 
-            // Mimic a small delay.
-            await new Promise((resolve) => {
-                setTimeout(resolve, 100);
-            });
-        }
+        do {
+            const response = await mockDeleteRequest(message.value);
+
+            if (response.status === 429) {
+                console.log(`Rate limited! Waiting for ${response.headers['Retry-After']} seconds.`);
+
+                await new Promise((resolve) => {
+                    setTimeout(resolve, parseFloat(response.headers['Retry-After']) * 1000)
+                });
+
+                // Retry this message after waiting.
+                retry = true;
+            } else {
+                console.log(`Deleted message with ID: ${message.value}`);
+
+                retry = false;
+
+                // Ensure there's at least 250 ms between requests.
+                await new Promise((resolve) => {
+                    setTimeout(resolve, 250);
+                });
+            }
+        } while (retry); // Keep retrying the current message until it succeeds.
     }
 
     // Remove the processed channel from the subdirs list.
@@ -147,6 +162,32 @@ const deleteMessages = async (selectedChannel, messages, dataDumpPath, indexData
 
     // Return to channel listing after a successful completion.
     await displayChannelList(dataDumpPath, indexData, subdirectories);
+}
+
+const mockDeleteRequest = async (messageId) => {
+    // This function mimics the behavior of the Discord API.
+    // To be replaced with actual HTTP DELETE requests.
+
+    // Here, we randomly decide whether to simulate a rate limit.
+    if (Math.random() < 0.1) {  // 10% flat chance of a rate limit demonstration.
+        return {
+            status: 429,
+            headers: {
+                'X-RateLimit-Global': false,
+                'Retry-After': (Math.random() * 5).toFixed(2)  // Random wait time between 0 and 5 seconds
+            },
+            body: {
+                "message": "You are being rate limited.",
+                "retry_after": (Math.random() * 5).toFixed(2),
+                "global": false
+            }
+        };
+    } else {
+        return {
+            status: 204 // No content
+            // NOTE: Look into the browser calls. Do we get 200 or some other code?
+        }
+    }
 }
 
 // Start the script by prompting the user for the data dump path.

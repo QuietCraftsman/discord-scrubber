@@ -4,7 +4,32 @@ import { exit } from 'node:process';
 
 import csvParser from 'csv-parser';
 import inquirer from 'inquirer';
+import sqlite3 from 'sqlite3';
 
+
+const db = new sqlite3.Database('./deletions.db', (error) => {
+    if (error) {
+        console.error(error.message);
+    }
+
+    console.log('Connected to the deletions database.');
+});
+
+// Create the table.
+db.run(`CREATE TABLE IF NOT EXISTS deleted_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    channel_id TEXT NOT NULL,
+    message_id TEXT NOT NULL
+)`, (error) => {
+    if (error) {
+        console.error(error.message);
+    }
+
+    console.log('Table created.');
+});
+
+const channelId = 'CHANNEL_ID';
+const messageId = 'MESSAGE_ID';
 const apiUrl = `https://discord.com/api/v9/channels/${channelId}/messages/${messageId}`;
 
 const crawlDataDump = async (dataDumpPath) => {

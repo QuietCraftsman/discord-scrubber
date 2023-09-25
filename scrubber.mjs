@@ -5,6 +5,7 @@ import { exit } from 'node:process';
 import csvParser from 'csv-parser';
 import inquirer from 'inquirer';
 
+const apiUrl = `https://discord.com/api/v9/channels/${channelId}/messages/${messageId}`;
 
 const crawlDataDump = async (dataDumpPath) => {
     // Read the index.json from the messages directory.

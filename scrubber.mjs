@@ -2,6 +2,7 @@ import { createReadStream, existsSync, readFileSync, readdirSync, statSync } fro
 import { join } from 'node:path';
 import { exit } from 'node:process';
 
+import axios from 'axios';
 import csvParser from 'csv-parser';
 import inquirer from 'inquirer';
 import sqlite3 from 'sqlite3';
@@ -53,10 +54,6 @@ const isMessageDeleted = (channelId, messageId, callback) => {
         }
     });
 };
-
-const channelId = 'CHANNEL_ID';
-const messageId = 'MESSAGE_ID';
-const apiUrl = `https://discord.com/api/v9/channels/${channelId}/messages/${messageId}`;
 
 const crawlDataDump = async (dataDumpPath) => {
     // Read the index.json from the messages directory.
@@ -196,9 +193,12 @@ const deleteMessages = async (selectedChannel, messages, dataDumpPath, indexData
         }
 
         let retry = false;
+        let retryCount = 0;
+        const maxRetries = 5;
 
         do {
-            const response = await mockDeleteRequest(message.value);
+            const channelId = selectedChannel.substring(1);
+            const response = await deleteRequest(channelId, message.value);
 
             if (response.status === 429) {
                 console.log(`Rate limited! Waiting for ${response.headers['Retry-After']} seconds.`);
@@ -208,9 +208,15 @@ const deleteMessages = async (selectedChannel, messages, dataDumpPath, indexData
                 });
 
                 // Retry this message after waiting.
-                retry = true;
+                retryCount++;
+                retry = retryCount < maxRetries;
+            } else if (response.status !== 204 && response.status !== 200) {
+                console.error(`Failed to delete message with ID: ${message.value}. Status code: ${response.status}. Reason: ${response.data}`);
+
+                // No retry in case of a non-rate-limit error, but you can add logic here if needed
+                retry = false;
             } else {
-                console.log(`Deleted message with ID: ${message.value}`);
+                console.log(`Deleted  message with ID: ${message.value}`);
 
                 // Record the deletion to the database.
                 recordDeletion(selectedChannel, message.value);
@@ -258,6 +264,74 @@ const mockDeleteRequest = async (messageId) => {
         return {
             status: 204 // No content
             // NOTE: Look into the browser calls. Do we get 200 or some other code?
+        }
+    }
+}
+
+const deleteRequest = async (channelId, messageId) => {
+    try {
+        const response = await axios.delete(`https://discord.com/api/v9/channels/${channelId}/messages/${messageId}`, {
+            headers: {
+                'Accept': '*/*',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Accept-Language': 'en-GB,en;q=0.9,en-US;q=0.8',
+                'Authorization': `${global.accessToken}`,
+                'Origin': 'https://discord.com',
+                'Referer': `https://discord.com/channels/@me/${channelId}`
+            }
+        });
+
+        if (response.status === 204) { // 204 is the HTTP status code for 'No Content', which is typical for DELETE requests
+            return {
+                status: 204
+            };
+        } else {
+            throw new Error(`Unexpected status code: ${response.status}`);
+        }
+    } catch (error) {
+        if (error.response) {
+            // The request was made and the server responded with a status code outside of the range of 2xx.
+            //console.log(`Server responded with an error: ${error.response.data}`);
+            //console.log(`Status code: ${error.response.status}`);
+            //console.log(`Headers: ${error.response.headers}`);
+
+            // Uh oh, we got throttled.
+            if (error.response.status == 429) {
+                return {
+                    status: 429,
+                    headers: {
+                        'Retry-After': error.response.headers['retry-after'] || 5
+                    },
+                    data: error.response.data
+                };
+            } else {
+                // Log the error and decide what to do
+                console.error(`Error for message ${messageId} in channel ${channelId}`);
+                console.error(`Status code: ${error.response.status}`);
+                console.error(`Error response: ${JSON.stringify(error.response.data)}`);
+
+                // For now, let's return an object with status and data so we can decide later
+                return {
+                    status: error.response.status,
+                    data: error.response.data
+                };
+            }
+        } else if (error.request) {
+            // The request was made but no response was received.
+            console.log(`No response received: ${error.request}`);
+
+            return {
+                status: 500,
+                data: 'No response received from the server.'
+            };
+        } else {
+            // Some other error occurred.
+            console.log(`Error: ${error.message}`);
+
+            return {
+                status: 500,
+                data: error.message
+            }
         }
     }
 }

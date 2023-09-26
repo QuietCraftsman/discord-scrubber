@@ -131,3 +131,6 @@ dist
 
 # code-workspace
 *.code-workspace
+
+# SQLite
+deletions.db

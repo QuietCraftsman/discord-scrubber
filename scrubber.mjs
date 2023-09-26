@@ -12,7 +12,7 @@ const db = new sqlite3.Database('./deletions.db', (error) => {
         console.error(error.message);
     }
 
-    console.log('Connected to the deletions database.');
+    //console.log('Connected to the deletions database.');
 });
 
 // Create the table.
@@ -25,8 +25,34 @@ db.run(`CREATE TABLE IF NOT EXISTS deleted_messages (
         console.error(error.message);
     }
 
-    console.log('Table created.');
+    //console.log('Table created.');
 });
+
+const recordDeletion = (channelId, messageId) => {
+    db.run(`INSERT INTO deleted_messages(
+        channel_id,
+        message_id
+    ) VALUES(?, ?)`, [channelId, messageId], (error) => {
+        if (error) {
+            console.error(error.message);
+        }
+
+        //console.log('Table created.');
+    });
+};
+
+const isMessageDeleted = (channelId, messageId, callback) => {
+    db.get(`SELECT message_id FROM deleted_messages
+    WHERE channel_id = ? AND message_id = ?`, [channelId, messageId], (error, row) => {
+        if (error) {
+            callback(error, null);
+        } else if (row) {
+            callback(null, true);   // Message was previously deleted.
+        } else {
+            callback(null, false);  // Message was not deleted.
+        }
+    });
+};
 
 const channelId = 'CHANNEL_ID';
 const messageId = 'MESSAGE_ID';
@@ -152,6 +178,23 @@ const deleteMessages = async (selectedChannel, messages, dataDumpPath, indexData
 
 
     for (const message of validMessages) {
+        // Verify if the message has been previously deleted.
+        const wasDeleted = await new Promise((resolve) => {
+            isMessageDeleted(selectedChannel, message.value, (error, result) => {
+                if (error) {
+                    console.error(error.message);
+                    resolve(true);  // To avoid re-deleting on error, "assume" it was deleted.
+                } else {
+                    resolve(result);
+                }
+            });
+        });
+
+        if (wasDeleted) {
+            console.log(`Skipping deletion for previously deleted message with ID: ${message.value}`);
+            continue;   // Skip to the next iteration if the message was previously deleted.
+        }
+
         let retry = false;
 
         do {
@@ -168,6 +211,9 @@ const deleteMessages = async (selectedChannel, messages, dataDumpPath, indexData
                 retry = true;
             } else {
                 console.log(`Deleted message with ID: ${message.value}`);
+
+                // Record the deletion to the database.
+                recordDeletion(selectedChannel, message.value);
 
                 retry = false;
 

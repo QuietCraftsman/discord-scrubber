@@ -7,13 +7,10 @@ import csvParser from 'csv-parser';
 import inquirer from 'inquirer';
 import sqlite3 from 'sqlite3';
 
-
 const db = new sqlite3.Database('./deletions.db', (error) => {
     if (error) {
         console.error(error.message);
     }
-
-    //console.log('Connected to the deletions database.');
 });
 
 // Create the table.
@@ -25,8 +22,6 @@ db.run(`CREATE TABLE IF NOT EXISTS deleted_messages (
     if (error) {
         console.error(error.message);
     }
-
-    //console.log('Table created.');
 });
 
 const recordDeletion = (channelId, messageId) => {
@@ -197,7 +192,7 @@ const deleteMessages = async (selectedChannel, messages, dataDumpPath, indexData
         const maxRetries = 5;
 
         do {
-            const channelId = selectedChannel.substring(1);
+            const channelId = selectedChannel.substring(1); // Remove the 'c' prefix.
             const response = await deleteRequest(channelId, message.value);
 
             if (response.status === 429) {
@@ -211,21 +206,21 @@ const deleteMessages = async (selectedChannel, messages, dataDumpPath, indexData
                 retryCount++;
                 retry = retryCount < maxRetries;
             } else if (response.status !== 204 && response.status !== 200) {
-                console.error(`Failed to delete message with ID: ${message.value}. Status code: ${response.status}. Reason: ${response.data}`);
+                console.error(`Failed to delete message with ID: ${message.value}. Status code: ${response.status}. Reason: ${JSON.stringify(response.data)}`);
 
-                // No retry in case of a non-rate-limit error, but you can add logic here if needed
+                // No retry in case of a non-rate-limit error, but you can add logic here if needed.
                 retry = false;
             } else {
-                console.log(`Deleted  message with ID: ${message.value}`);
+                console.log(`Deleted message with ID: ${message.value}`);
 
                 // Record the deletion to the database.
                 recordDeletion(selectedChannel, message.value);
 
                 retry = false;
 
-                // Ensure there's at least 250 ms between requests.
+                // Ensure there's at least 2500 ms between requests.
                 await new Promise((resolve) => {
-                    setTimeout(resolve, 250);
+                    setTimeout(resolve, 2500);
                 });
             }
         } while (retry); // Keep retrying the current message until it succeeds.
@@ -242,32 +237,6 @@ const deleteMessages = async (selectedChannel, messages, dataDumpPath, indexData
     await displayChannelList(dataDumpPath, indexData, subdirectories);
 }
 
-const mockDeleteRequest = async (messageId) => {
-    // This function mimics the behavior of the Discord API.
-    // To be replaced with actual HTTP DELETE requests.
-
-    // Here, we randomly decide whether to simulate a rate limit.
-    if (Math.random() < 0.1) {  // 10% flat chance of a rate limit demonstration.
-        return {
-            status: 429,
-            headers: {
-                'X-RateLimit-Global': false,
-                'Retry-After': (Math.random() * 5).toFixed(2)  // Random wait time between 0 and 5 seconds
-            },
-            body: {
-                "message": "You are being rate limited.",
-                "retry_after": (Math.random() * 5).toFixed(2),
-                "global": false
-            }
-        };
-    } else {
-        return {
-            status: 204 // No content
-            // NOTE: Look into the browser calls. Do we get 200 or some other code?
-        }
-    }
-}
-
 const deleteRequest = async (channelId, messageId) => {
     try {
         const response = await axios.delete(`https://discord.com/api/v9/channels/${channelId}/messages/${messageId}`, {
@@ -277,7 +246,7 @@ const deleteRequest = async (channelId, messageId) => {
                 'Accept-Language': 'en-GB,en;q=0.9,en-US;q=0.8',
                 'Authorization': `${global.accessToken}`,
                 'Origin': 'https://discord.com',
-                'Referer': `https://discord.com/channels/@me/${channelId}`
+                //'Referer': `https://discord.com/channels/@me/${channelId}`
             }
         });
 
@@ -291,9 +260,6 @@ const deleteRequest = async (channelId, messageId) => {
     } catch (error) {
         if (error.response) {
             // The request was made and the server responded with a status code outside of the range of 2xx.
-            //console.log(`Server responded with an error: ${error.response.data}`);
-            //console.log(`Status code: ${error.response.status}`);
-            //console.log(`Headers: ${error.response.headers}`);
 
             // Uh oh, we got throttled.
             if (error.response.status == 429) {
